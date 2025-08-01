@@ -3,7 +3,7 @@ services:
     name: voting-app
     env: python
     buildCommand: "pip install -r requirements.txt"
-    startCommand: "gunicorn app:app"
+    startCommand: gunicorn app:app --worker-class gthread --threads 4 --bind 0.0.0.0:$PORT
     envVars:
       - key: MONGO_URI
         value: mongodb+srv://abc:93565227@vote.2zj2mng.mongodb.net/
