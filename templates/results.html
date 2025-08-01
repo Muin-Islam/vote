@@ -130,17 +130,11 @@
     </style>
 </head>
 <body>
-    <div class="results-container">
-        <h1>Voting Results</h1>
-        <ul>
-            {% for option, count in results %}
-            <li>
-                <span class="option">{{ option }}</span>
-                <span class="votes">{{ count }} votes</span>
-            </li>
-            {% endfor %}
-        </ul>
-    </div>
-    <a href="/">Go back</a>
+  <h1>Voting Results</h1>
+  <ul>
+    {% for result in results %}
+      <li>{{ result.option }}: {{ result.count }} votes</li>
+    {% endfor %}
+  </ul>
 </body>
 </html>
