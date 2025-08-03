@@ -16,6 +16,10 @@ def get_db():
         app.config['db'] = app.config['db_client']["voting_db"]
     return app.config['db']
 
+def get_votes_collection():
+    db = get_db()
+    return db["votes"]
+
 @app.teardown_appcontext
 def teardown_db(exception):
     if 'db_client' in app.config:
@@ -28,9 +32,7 @@ def get_ip():
 
 @app.route("/", methods=["GET", "POST"])
 def vote():
-    db = get_db()
-    votes_col = db["votes"]
-    
+    votes_col = get_votes_collection()
     
     cookie_vote_flag = request.cookies.get("voted")
     last_time = request.cookies.get("last_vote_time")
@@ -55,7 +57,7 @@ def vote():
 
             # Set cookies to prevent multiple votes
             resp = make_response(redirect(url_for("results")))
-            resp.set_cookie("voted", "yes", max_age=60*60*24)  # 1 day instead of 7
+            resp.set_cookie("voted", "yes", max_age=60*60*24)  # 1 day
             resp.set_cookie("last_vote_time", str(time.time()))
             return resp
 
@@ -67,6 +69,7 @@ def vote():
 
 @app.route("/results")
 def results():
+    votes_col = get_votes_collection()
     results = list(votes_col.aggregate([
       {"$group": {"_id": "$option", "count": {"$sum": 1}}},
       {"$project": {"_id": 0, "option": "$_id", "count": 1}}
@@ -81,6 +84,4 @@ def reset():
 
 if __name__ == "__main__":
     app.run()
-
-
 
