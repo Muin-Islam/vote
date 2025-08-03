@@ -9,10 +9,17 @@ load_dotenv()
 
 app = Flask(__name__)
 
-# Use environment variable
-client = MongoClient(os.getenv("MONGO_URI"))
-db = client["voting_db"]
-votes_col = db["votes"]
+# Improved MongoDB connection handling
+def get_db():
+    if 'db' not in app.config:
+        app.config['db_client'] = MongoClient(os.getenv("MONGO_URI"))
+        app.config['db'] = app.config['db_client']["voting_db"]
+    return app.config['db']
+
+@app.teardown_appcontext
+def teardown_db(exception):
+    if 'db_client' in app.config:
+        app.config['db_client'].close()
 
 RATE_LIMIT_SECONDS = 5
 
@@ -21,6 +28,10 @@ def get_ip():
 
 @app.route("/", methods=["GET", "POST"])
 def vote():
+    db = get_db()
+    votes_col = db["votes"]
+    
+    
     cookie_vote_flag = request.cookies.get("voted")
     last_time = request.cookies.get("last_vote_time")
 
@@ -70,5 +81,6 @@ def reset():
 
 if __name__ == "__main__":
     app.run()
+
 
 
