@@ -3,11 +3,9 @@ services:
     name: voting-app
     env: python
     buildCommand: "pip install -r requirements.txt"
-    startCommand: "gunicorn --worker-tmp-dir /dev/shm --worker-class gthread --threads 4 --bind 0.0.0.0:$PORT app:app"
+    startCommand: "gunicorn --worker-tmp-dir /dev/shm --threads 4 --bind 0.0.0.0:$PORT app:app"
     envVars:
       - key: MONGO_URI
-        value: mongodb+srv://abc:93565227@vote.2zj2mng.mongodb.net/
+        value: mongodb+srv://abc:93565227@vote.2zj2mng.mongodb.net/?retryWrites=true&w=majority
       - key: PYTHONUNBUFFERED
         value: 1
-      - key: GUNICORN_CMD_ARGS
-        value: "--workers=2 --threads=4"
