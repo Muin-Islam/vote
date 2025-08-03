@@ -2,3 +2,4 @@ flask==2.3.2
 pymongo==4.3.3
 python-dotenv==1.0.0
 gunicorn==20.1.0
+setuptools==80.0.0  # Pinned to avoid pkg_resources deprecation
