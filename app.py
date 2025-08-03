@@ -55,13 +55,14 @@ def vote():
 
 @app.route("/results")
 def results():
-    pipeline = [
-        {"$group": {"_id": "$option", "count": {"$sum": 1}}},
-        {"$project": {"_id": 0, "option": "$_id", "count": 1}}
-    ]
-    results = list(votes_col.aggregate(pipeline))
+    results = list(votes_col.aggregate([
+      {"$group": {"_id": "$option", "count": {"$sum": 1}}},
+      {"$project": {"_id": 0, "option": "$_id", "count": 1}}
+    ]))
+    print("RESULTS=>", results)   # debug line
     return render_template("results.html", results=results)
 
 
 if __name__ == "__main__":
     app.run()
+
