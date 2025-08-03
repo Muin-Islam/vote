@@ -21,31 +21,38 @@ def get_ip():
 
 @app.route("/", methods=["GET", "POST"])
 def vote():
-    ip = get_ip()
     cookie_vote_flag = request.cookies.get("voted")
-
     last_time = request.cookies.get("last_vote_time")
-    if last_time and time.time() - float(last_time) < RATE_LIMIT_SECONDS:
-        return "You're voting too fast. Wait a bit."
+
+    # Rate limiting (based on last cookie timestamp)
+    if request.method == "POST" and last_time and time.time() - float(last_time) < RATE_LIMIT_SECONDS:
+        return "You're voting too fast. Please wait a few seconds."
 
     if request.method == "POST":
-        if cookie_vote_flag == "yes" or votes_col.find_one({"ip": ip}):
+        if cookie_vote_flag == "yes":
             return redirect(url_for("results"))
 
         option = request.form.get("option")
-        votes_col.insert_one({"ip": ip, "option": option, "timestamp": int(time.time())})
+        if option:
+            # Store IP and timestamp for logging/stats
+            ip = get_ip()
+            votes_col.insert_one({
+                "ip": ip,
+                "option": option,
+                "timestamp": int(time.time())
+            })
 
-        resp = make_response(redirect(url_for("results")))
-        resp.set_cookie("voted", "yes", max_age=60*60*24*7)
-        resp.set_cookie("last_vote_time", str(time.time()))
-        return resp
+            # Set cookies to prevent multiple votes
+            resp = make_response(redirect(url_for("results")))
+            resp.set_cookie("voted", "yes", max_age=60*60*24)  # 1 day instead of 7
+            resp.set_cookie("last_vote_time", str(time.time()))
+            return resp
 
-    # GET method — only render the form if not already voted
-    if cookie_vote_flag == "yes" or votes_col.find_one({"ip": ip}):
+    # Only redirect to results if they've already voted AND it's a GET request
+    if request.method == "GET" and cookie_vote_flag == "yes":
         return redirect(url_for("results"))
 
     return render_template("vote.html")
-
 
 @app.route("/results")
 def results():
@@ -53,9 +60,13 @@ def results():
       {"$group": {"_id": "$option", "count": {"$sum": 1}}},
       {"$project": {"_id": 0, "option": "$_id", "count": 1}}
     ]))
-    print("RESULTS=>", results)   # debug line
     return render_template("results.html", results=results)
 
+@app.route("/reset")
+def reset():
+    resp = make_response(redirect(url_for("vote")))
+    resp.set_cookie("voted", "", expires=0)
+    return resp
 
 if __name__ == "__main__":
     app.run()
