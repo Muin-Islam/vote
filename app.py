@@ -9,21 +9,14 @@ load_dotenv()
 
 app = Flask(__name__)
 
-# Improved MongoDB connection handling
-def get_db():
-    if 'db' not in app.config:
-        app.config['db_client'] = MongoClient(os.getenv("MONGO_URI"))
-        app.config['db'] = app.config['db_client']["voting_db"]
-    return app.config['db']
+# Initialize MongoDB connection at app startup
+client = MongoClient(os.getenv("MONGO_URI"))
+db = client["voting_db"]
+votes_col = db["votes"]
 
-def get_votes_collection():
-    db = get_db()
-    return db["votes"]
-
-@app.teardown_appcontext
-def teardown_db(exception):
-    if 'db_client' in app.config:
-        app.config['db_client'].close()
+# Create indexes (only needed once)
+votes_col.create_index("ip")
+votes_col.create_index("timestamp")
 
 RATE_LIMIT_SECONDS = 5
 
@@ -32,12 +25,10 @@ def get_ip():
 
 @app.route("/", methods=["GET", "POST"])
 def vote():
-    votes_col = get_votes_collection()
-    
     cookie_vote_flag = request.cookies.get("voted")
     last_time = request.cookies.get("last_vote_time")
 
-    # Rate limiting (based on last cookie timestamp)
+    # Rate limiting
     if request.method == "POST" and last_time and time.time() - float(last_time) < RATE_LIMIT_SECONDS:
         return "You're voting too fast. Please wait a few seconds."
 
@@ -47,7 +38,6 @@ def vote():
 
         option = request.form.get("option")
         if option:
-            # Store IP and timestamp for logging/stats
             ip = get_ip()
             votes_col.insert_one({
                 "ip": ip,
@@ -55,13 +45,11 @@ def vote():
                 "timestamp": int(time.time())
             })
 
-            # Set cookies to prevent multiple votes
             resp = make_response(redirect(url_for("results")))
             resp.set_cookie("voted", "yes", max_age=60*60*24)  # 1 day
             resp.set_cookie("last_vote_time", str(time.time()))
             return resp
 
-    # Only redirect to results if they've already voted AND it's a GET request
     if request.method == "GET" and cookie_vote_flag == "yes":
         return redirect(url_for("results"))
 
@@ -69,12 +57,15 @@ def vote():
 
 @app.route("/results")
 def results():
-    votes_col = get_votes_collection()
-    results = list(votes_col.aggregate([
-      {"$group": {"_id": "$option", "count": {"$sum": 1}}},
-      {"$project": {"_id": 0, "option": "$_id", "count": 1}}
-    ]))
-    return render_template("results.html", results=results)
+    try:
+        results = list(votes_col.aggregate([
+            {"$group": {"_id": "$option", "count": {"$sum": 1}}},
+            {"$project": {"_id": 0, "option": "$_id", "count": 1}}
+        ]))
+        return render_template("results.html", results=results)
+    except Exception as e:
+        app.logger.error(f"Error fetching results: {str(e)}")
+        return "Error loading results. Please try again later.", 500
 
 @app.route("/reset")
 def reset():
