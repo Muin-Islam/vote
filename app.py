@@ -21,37 +21,31 @@ def get_ip():
 
 @app.route("/", methods=["GET", "POST"])
 def vote():
+    ip = get_ip()
     cookie_vote_flag = request.cookies.get("voted")
-    last_time = request.cookies.get("last_vote_time")
 
-    # Rate limiting (based on last cookie timestamp)
+    last_time = request.cookies.get("last_vote_time")
     if last_time and time.time() - float(last_time) < RATE_LIMIT_SECONDS:
-        return "You're voting too fast. Please wait a few seconds."
+        return "You're voting too fast. Wait a bit."
 
     if request.method == "POST":
-        if cookie_vote_flag == "yes":
+        if cookie_vote_flag == "yes" or votes_col.find_one({"ip": ip}):
             return redirect(url_for("results"))
 
         option = request.form.get("option")
-        if option:
-            # Store IP and timestamp for logging/stats
-            ip = get_ip()
-            votes_col.insert_one({
-                "ip": ip,
-                "option": option,
-                "timestamp": int(time.time())
-            })
+        votes_col.insert_one({"ip": ip, "option": option, "timestamp": int(time.time())})
 
-            # Set cookies to prevent multiple votes
-            resp = make_response(redirect(url_for("results")))
-            resp.set_cookie("voted", "yes", max_age=60*60*24*7)  # 7 days
-            resp.set_cookie("last_vote_time", str(time.time()))
-            return resp
+        resp = make_response(redirect(url_for("results")))
+        resp.set_cookie("voted", "yes", max_age=60*60*24*7)
+        resp.set_cookie("last_vote_time", str(time.time()))
+        return resp
 
-    if cookie_vote_flag == "yes":
+    # GET method — only render the form if not already voted
+    if cookie_vote_flag == "yes" or votes_col.find_one({"ip": ip}):
         return redirect(url_for("results"))
 
     return render_template("vote.html")
+
 
 @app.route("/results")
 def results():
@@ -65,4 +59,5 @@ def results():
 
 if __name__ == "__main__":
     app.run()
+
 
