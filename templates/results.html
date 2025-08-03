@@ -136,14 +136,8 @@
       <li>{{ result.option }}: {{ result.count }} votes</li>
     {% endfor %}
   </ul>
-      <!-- Add this at the bottom of the body in results.html -->
-{% if request.cookies.get("voted") != "yes" %}
-    <a href="{{ url_for('vote') }}">Back to Voting</a>
-{% else %}
-    <p>You've already voted. Thank you!</p>
-    <!-- For testing, you can include this: -->
-    <a href="{{ url_for('reset') }}">Reset Vote (for testing)</a>
-{% endif %}
+  
 </body>
 </html>
+
 
